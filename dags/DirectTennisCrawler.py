@@ -19,10 +19,10 @@ import mysql
 from sqlalchemy import create_engine
 
 def runCrawler():
-    endpoint = config.endpoint
-    username = config.username
-    password = config.password
-    database = config.database
+    endpoint = config.rds_endpoint
+    username = config.rds_username
+    password = config.rds_password
+    database = config.rds_database
 
     #con = mysql.connector.connect(user=username, password=password, host=endpoint, database=database)
     #mycursor = con.cursor()
