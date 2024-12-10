@@ -18,15 +18,45 @@ import config
 import mysql
 from sqlalchemy import create_engine
 
+from pymongo import MongoClient
+
+ENDPOINT = config.rds_endpoint
+USERNAME = config.rds_username
+PASSWORD = config.rds_password
+DATABASE = config.rds_database
+MONGOCNX = config.mongo_cnx_string
+MONGODB_NAME = 'tennis_prod'
+MONGODB_COLLECTION = 'tennisprod'
+
+
+class AtlasClient ():
+
+   def __init__ (self, mongocnx, dbname):
+       self.mongodb_client = MongoClient(mongocnx)
+       self.database = self.mongodb_client[dbname]
+
+   def ping (self):
+       self.mongodb_client.admin.command('ping')
+
+   def get_collection (self, collection_name):
+       collection = self.database[collection_name]
+       return collection
+
+   def find (self, collection_name, filter = {}, limit=0):
+       collection = self.database[collection_name]
+       items = list(collection.find(filter=filter, limit=limit))
+       return items
+
+   def insert (self, collection_name, data = {}):
+       collection = self.database[collection_name]
+       x = collection.insert_many(data)
+
+
 def runCrawler():
-    endpoint = config.rds_endpoint
-    username = config.rds_username
-    password = config.rds_password
-    database = config.rds_database
 
     #con = mysql.connector.connect(user=username, password=password, host=endpoint, database=database)
     #mycursor = con.cursor()
-    engine = create_engine("mysql+mysqlconnector://admin:adminadmin@database-1.c3uumi0k2s9r.eu-west-2.rds.amazonaws.com/Data")
+    engine = create_engine(f'mysql+mysqlconnector://{USERNAME}:{PASSWORD}@{ENDPOINT}/{DATABASE}')
 
     chrome_options = webdriver.ChromeOptions()
     chrome_options.add_argument("--headless")
@@ -99,7 +129,12 @@ def runCrawler():
         dict = {'Product Name': product_names, 'Product Price': product_prices, 'Old Price': old_prices,
                 'Product Cat': product_category, 'Time Added': time_added}
         df1 = pd.DataFrame(dict)
+        data_dict = json.loads(df1.to_json(orient="records"))
+
         df1.to_sql(name='tennisprod', con=engine, if_exists='append', index=False)
+        atlas_client = AtlasClient(MONGOCNX, MONGODB_NAME)
+        atlas_clinet.insert(MONGODB_COLLECTION, data_dict)
+
         df = pd.concat([df, df1])
         print(f"{b + 1} of {len(menuitem)} items scraped....")
 
@@ -107,3 +142,7 @@ def runCrawler():
 
     driver.quit()
     df.to_csv('data/direct_tennis_products.csv', index=False)
+
+
+if __name__ == '__main__':
+    runCrawler()
